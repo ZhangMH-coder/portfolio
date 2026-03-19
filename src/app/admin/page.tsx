@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { profileApi, skillApi, projectApi, promptApi, categoryApi, promptSetApi, managedImageApi, contactInfoApi } from '../../lib/api';
+import { profileApi, skillApi, projectApi, promptApi, categoryApi, promptSetApi, managedImageApi, contactInfoApi, videoWorkApi, imageWorkApi } from '../../lib/api';
 
 // 项目类型定义
 interface Project {
@@ -13,6 +13,29 @@ interface Project {
   techStack: string[];
   demoLink?: string;
   githubLink?: string;
+  isFeatured?: boolean;
+}
+
+// 视频作品类型定义
+interface VideoWork {
+  id: string;
+  title: string;
+  description: string;
+  videoUrl: string;
+  thumbnail?: string;
+  prompt?: string;
+  tags: string[];
+  isFeatured?: boolean;
+}
+
+// AI图片作品类型定义
+interface ImageWork {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  prompt?: string;
+  tags: string[];
   isFeatured?: boolean;
 }
 
@@ -73,6 +96,10 @@ const AdminPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('projects');
   // 项目列表
   const [projects, setProjects] = useState<Project[]>([]);
+  // 视频作品列表
+  const [videoWorks, setVideoWorks] = useState<VideoWork[]>([]);
+  // AI图片作品列表
+  const [imageWorks, setImageWorks] = useState<ImageWork[]>([]);
   // 技能列表
   const [skills, setSkills] = useState<Skill[]>([]);
   // 个人信息
@@ -99,6 +126,8 @@ const AdminPage: React.FC = () => {
   const [promptSets, setPromptSets] = useState<PromptSet[]>([]);
   // 编辑状态
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editingVideoWork, setEditingVideoWork] = useState<VideoWork | null>(null);
+  const [editingImageWork, setEditingImageWork] = useState<ImageWork | null>(null);
   const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
   const [editingPrompt, setEditingPrompt] = useState<Prompt | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -111,6 +140,25 @@ const AdminPage: React.FC = () => {
     techStack: [],
     demoLink: '',
     githubLink: '',
+    isFeatured: false
+  });
+  // 视频作品表单状态
+  const [videoFormData, setVideoFormData] = useState<Omit<VideoWork, 'id'>>({
+    title: '',
+    description: '',
+    videoUrl: '',
+    thumbnail: '',
+    prompt: '',
+    tags: [],
+    isFeatured: false
+  });
+  // AI作品表单状态
+  const [imageFormData, setImageFormData] = useState<Omit<ImageWork, 'id'>>({
+    title: '',
+    description: '',
+    imageUrl: '',
+    prompt: '',
+    tags: [],
     isFeatured: false
   });
   const [skillFormData, setSkillFormData] = useState<Omit<Skill, 'id'>>({
@@ -158,6 +206,8 @@ const AdminPage: React.FC = () => {
   const [techStackInput, setTechStackInput] = useState('');
   // 模态框状态
   const [showModal, setShowModal] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
   const [showSkillModal, setShowSkillModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showPromptModal, setShowPromptModal] = useState(false);
@@ -165,10 +215,14 @@ const AdminPage: React.FC = () => {
   const [showSetModal, setShowSetModal] = useState(false);
   // 模态框标题
   const [modalTitle, setModalTitle] = useState('添加项目');
+  const [videoModalTitle, setVideoModalTitle] = useState('添加视频作品');
+  const [imageModalTitle, setImageModalTitle] = useState('添加AI作品');
   const [skillModalTitle, setSkillModalTitle] = useState('添加技能');
   const [promptModalTitle, setPromptModalTitle] = useState('添加提示词');
   const [categoryModalTitle, setCategoryModalTitle] = useState('添加分类');
   const [promptSetModalTitle, setPromptSetModalTitle] = useState('添加指令集');
+  // 标签输入
+  const [tagInput, setTagInput] = useState('');
   // 云端图片列表
   const [cloudImages, setCloudImages] = useState<string[]>([]);
   const [showCloudPicker, setShowCloudPicker] = useState(false);
@@ -182,6 +236,11 @@ const AdminPage: React.FC = () => {
   
   // 项目图片上传状态
   const [isUploadingProjectImage, setIsUploadingProjectImage] = useState(false);
+  // 视频上传状态
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
+  // AI作品图片上传状态
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // 加载已管理的图片
   useEffect(() => {
@@ -230,45 +289,62 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  // 处理项目图片上传
+  // 处理项目图片上传（支持多选）
   const handleProjectImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // 验证文件类型
-      if (!file.type.startsWith('image/')) {
-        alert('请选择图片文件');
-        return;
-      }
-      
-      // 验证文件大小（限制 5MB）
-      if (file.size > 5 * 1024 * 1024) {
-        alert('图片大小不能超过 5MB');
-        return;
-      }
-      
-      setIsUploadingProjectImage(true);
-      
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    const fileArray = Array.from(files);
+    const invalidFiles = fileArray.filter(file => {
+      if (!file.type.startsWith('image/')) return true;
+      if (file.size > 5 * 1024 * 1024) return true;
+      return false;
+    });
+    
+    if (invalidFiles.length > 0) {
+      alert('请选择有效的图片文件，且每张图片大小不超过 5MB');
+      return;
+    }
+    
+    setIsUploadingProjectImage(true);
+    
+    let uploadedCount = 0;
+    const newImages: string[] = [];
+    
+    fileArray.forEach((file) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64Url = reader.result as string;
+      reader.onload = () => {
+        newImages.push(reader.result as string);
+        uploadedCount++;
         
-        // 添加到表单图片列表
-        setFormData(prev => ({
-          ...prev,
-          images: [...prev.images, base64Url]
-        }));
-        
-        setIsUploadingProjectImage(false);
-        alert('图片上传成功');
+        if (uploadedCount === fileArray.length) {
+          setFormData(prev => ({
+            ...prev,
+            images: [...prev.images, ...newImages]
+          }));
+          setIsUploadingProjectImage(false);
+          alert(`成功上传 ${newImages.length} 张图片`);
+        }
       };
       
       reader.onerror = () => {
-        setIsUploadingProjectImage(false);
-        alert('图片上传失败，请重试');
+        uploadedCount++;
+        if (uploadedCount === fileArray.length) {
+          setIsUploadingProjectImage(false);
+          if (newImages.length > 0) {
+            setFormData(prev => ({
+              ...prev,
+              images: [...prev.images, ...newImages]
+            }));
+            alert(`成功上传 ${newImages.length} 张图片`);
+          } else {
+            alert('图片上传失败，请重试');
+          }
+        }
       };
       
       reader.readAsDataURL(file);
-    }
+    });
   };
 
   // 从 API 加载数据
@@ -281,6 +357,22 @@ const AdminPage: React.FC = () => {
           setProjects(projectsData);
         } else {
           setProjects([]);
+        }
+
+        // 加载视频作品数据
+        const videoWorksData = await videoWorkApi.getVideoWorks();
+        if (videoWorksData && videoWorksData.length > 0) {
+          setVideoWorks(videoWorksData);
+        } else {
+          setVideoWorks([]);
+        }
+
+        // 加载AI作品数据
+        const imageWorksData = await imageWorkApi.getImageWorks();
+        if (imageWorksData && imageWorksData.length > 0) {
+          setImageWorks(imageWorksData);
+        } else {
+          setImageWorks([]);
         }
 
         // 加载技能数据
@@ -810,6 +902,325 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  // 处理删除视频作品
+  const handleDeleteVideoWork = async (id: string) => {
+    if (confirm('确定要删除这个视频作品吗？')) {
+      try {
+        await videoWorkApi.deleteVideoWork(id);
+        const updatedVideoWorks = videoWorks.filter(vw => vw.id !== id);
+        setVideoWorks(updatedVideoWorks);
+      } catch (error) {
+        console.error('删除视频作品失败:', error);
+        alert('删除视频作品失败，请重试');
+      }
+    }
+  };
+
+  // 处理保存视频作品
+  const handleSaveVideoWork = async () => {
+    if (!videoFormData.title || !videoFormData.videoUrl) {
+      alert('请填写标题并上传视频');
+      return;
+    }
+
+    try {
+      if (editingVideoWork) {
+        const updatedVideoWork = await videoWorkApi.updateVideoWork(editingVideoWork.id, videoFormData);
+        const updatedVideoWorks = videoWorks.map(vw => 
+          vw.id === editingVideoWork.id ? updatedVideoWork : vw
+        );
+        setVideoWorks(updatedVideoWorks);
+      } else {
+        const newVideoWork = await videoWorkApi.createVideoWork(videoFormData);
+        const updatedVideoWorks = [...videoWorks, newVideoWork];
+        setVideoWorks(updatedVideoWorks);
+      }
+
+      setShowVideoModal(false);
+      setEditingVideoWork(null);
+      setVideoFormData({
+        title: '',
+        description: '',
+        videoUrl: '',
+        thumbnail: '',
+        prompt: '',
+        tags: [],
+        isFeatured: false
+      });
+    } catch (error) {
+      console.error('保存视频作品失败:', error);
+      alert('保存视频作品失败，请重试');
+    }
+  };
+
+  // 处理添加视频作品
+  const handleAddVideoWork = () => {
+    setEditingVideoWork(null);
+    setVideoFormData({
+      title: '',
+      description: '',
+      videoUrl: '',
+      thumbnail: '',
+      prompt: '',
+      tags: [],
+      isFeatured: false
+    });
+    setVideoModalTitle('添加视频作品');
+    setShowVideoModal(true);
+  };
+
+  // 处理编辑视频作品
+  const handleEditVideoWork = (videoWork: VideoWork) => {
+    setEditingVideoWork(videoWork);
+    setVideoFormData({
+      title: videoWork.title,
+      description: videoWork.description,
+      videoUrl: videoWork.videoUrl,
+      thumbnail: videoWork.thumbnail || '',
+      prompt: videoWork.prompt || '',
+      tags: videoWork.tags || [],
+      isFeatured: videoWork.isFeatured || false
+    });
+    setVideoModalTitle('编辑视频作品');
+    setShowVideoModal(true);
+  };
+
+  // 处理视频作品精选切换
+  const toggleFeaturedVideoWork = async (id: string) => {
+    const videoWorkToUpdate = videoWorks.find(vw => vw.id === id);
+    if (videoWorkToUpdate) {
+      try {
+        const updatedVideoWork = await videoWorkApi.updateVideoWork(id, {
+          ...videoWorkToUpdate,
+          isFeatured: !videoWorkToUpdate.isFeatured
+        });
+        const updatedVideoWorks = videoWorks.map(vw => 
+          vw.id === id ? updatedVideoWork : vw
+        );
+        setVideoWorks(updatedVideoWorks);
+      } catch (error) {
+        console.error('更新精选状态失败:', error);
+        alert('更新精选状态失败，请重试');
+      }
+    }
+  };
+
+  // 处理AI作品表单输入变化
+  const handleImageInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setImageFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // 处理添加AI作品
+  const handleAddImageWork = () => {
+    setEditingImageWork(null);
+    setImageFormData({
+      title: '',
+      description: '',
+      imageUrl: '',
+      prompt: '',
+      tags: [],
+      isFeatured: false
+    });
+    setImageModalTitle('添加AI作品');
+    setShowImageModal(true);
+  };
+
+  // 处理编辑AI作品
+  const handleEditImageWork = (imageWork: ImageWork) => {
+    setEditingImageWork(imageWork);
+    setImageFormData({
+      title: imageWork.title,
+      description: imageWork.description,
+      imageUrl: imageWork.imageUrl,
+      prompt: imageWork.prompt || '',
+      tags: imageWork.tags || [],
+      isFeatured: imageWork.isFeatured || false
+    });
+    setImageModalTitle('编辑AI作品');
+    setShowImageModal(true);
+  };
+
+  // 处理删除AI作品
+  const handleDeleteImageWork = async (id: string) => {
+    if (confirm('确定要删除这个AI作品吗？')) {
+      try {
+        await imageWorkApi.deleteImageWork(id);
+        const updatedImageWorks = imageWorks.filter(iw => iw.id !== id);
+        setImageWorks(updatedImageWorks);
+      } catch (error) {
+        console.error('删除AI作品失败:', error);
+        alert('删除AI作品失败，请重试');
+      }
+    }
+  };
+
+  // 处理保存AI作品
+  const handleSaveImageWork = async () => {
+    if (!imageFormData.title || !imageFormData.description || !imageFormData.imageUrl) {
+      alert('请填写标题、描述和图片链接');
+      return;
+    }
+
+    try {
+      if (editingImageWork) {
+        const updatedImageWork = await imageWorkApi.updateImageWork(editingImageWork.id, imageFormData);
+        const updatedImageWorks = imageWorks.map(iw => 
+          iw.id === editingImageWork.id ? updatedImageWork : iw
+        );
+        setImageWorks(updatedImageWorks);
+      } else {
+        const newImageWork = await imageWorkApi.createImageWork(imageFormData);
+        const updatedImageWorks = [...imageWorks, newImageWork];
+        setImageWorks(updatedImageWorks);
+      }
+
+      setShowImageModal(false);
+      setEditingImageWork(null);
+      setImageFormData({
+        title: '',
+        description: '',
+        imageUrl: '',
+        prompt: '',
+        tags: [],
+        isFeatured: false
+      });
+    } catch (error) {
+      console.error('保存AI作品失败:', error);
+      alert('保存AI作品失败，请重试');
+    }
+  };
+
+  // 处理AI作品精选切换
+  const toggleFeaturedImageWork = async (id: string) => {
+    const imageWorkToUpdate = imageWorks.find(iw => iw.id === id);
+    if (imageWorkToUpdate) {
+      try {
+        const updatedImageWork = await imageWorkApi.updateImageWork(id, {
+          ...imageWorkToUpdate,
+          isFeatured: !imageWorkToUpdate.isFeatured
+        });
+        const updatedImageWorks = imageWorks.map(iw => 
+          iw.id === id ? updatedImageWork : iw
+        );
+        setImageWorks(updatedImageWorks);
+      } catch (error) {
+        console.error('更新精选状态失败:', error);
+        alert('更新精选状态失败，请重试');
+      }
+    }
+  };
+
+  // 处理AI作品图片上传
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('请选择图片文件');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('图片大小不能超过 10MB');
+      return;
+    }
+
+    setIsUploadingImage(true);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageFormData(prev => ({
+        ...prev,
+        imageUrl: reader.result as string
+      }));
+      setIsUploadingImage(false);
+      alert('图片上传成功');
+    };
+
+    reader.onerror = () => {
+      setIsUploadingImage(false);
+      alert('图片上传失败，请重试');
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  // 处理AI作品标签添加
+  const handleImageTagAdd = () => {
+    if (tagInput.trim() && !imageFormData.tags.includes(tagInput.trim())) {
+      setImageFormData(prev => ({
+        ...prev,
+        tags: [...prev.tags, tagInput.trim()]
+      }));
+      setTagInput('');
+    }
+  };
+
+  // 处理AI作品标签删除
+  const handleImageTagRemove = (tag: string) => {
+    setImageFormData(prev => ({
+      ...prev,
+      tags: prev.tags.filter(t => t !== tag)
+    }));
+  };
+
+  // 处理添加标签
+  const handleAddTag = () => {
+    if (tagInput.trim() && !videoFormData.tags.includes(tagInput.trim())) {
+      setVideoFormData(prev => ({
+        ...prev,
+        tags: [...prev.tags, tagInput.trim()]
+      }));
+      setTagInput('');
+    }
+  };
+
+  // 处理删除标签
+  const handleRemoveTag = (tag: string) => {
+    setVideoFormData(prev => ({
+      ...prev,
+      tags: prev.tags.filter(t => t !== tag)
+    }));
+  };
+
+  // 处理视频上传
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('video/')) {
+      alert('请选择视频文件');
+      return;
+    }
+
+    if (file.size > 100 * 1024 * 1024) {
+      alert('视频大小不能超过 100MB');
+      return;
+    }
+
+    setIsUploadingVideo(true);
+    setVideoUploadProgress(0);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setVideoFormData(prev => ({
+        ...prev,
+        videoUrl: reader.result as string
+      }));
+      setIsUploadingVideo(false);
+      setVideoUploadProgress(100);
+      alert('视频上传成功');
+    };
+
+    reader.onerror = () => {
+      setIsUploadingVideo(false);
+      alert('视频上传失败，请重试');
+    };
+
+    reader.readAsDataURL(file);
+  };
+
   // 处理技能表单输入变化
   const handleSkillInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -1156,6 +1567,8 @@ const AdminPage: React.FC = () => {
               <nav className="space-y-2">
                 {[
                   { id: 'projects', name: '项目管理' },
+                  { id: 'aiWorks', name: 'AI作品管理' },
+                  { id: 'videoWorks', name: '视频作品' },
                   { id: 'skills', name: '技能管理' },
                   { id: 'profile', name: '个人信息' },
                   { id: 'contact', name: '联系信息' },
@@ -1263,6 +1676,158 @@ const AdminPage: React.FC = () => {
                       <div className="text-center py-12 text-gray-400">
                         暂无项目数据
                       </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 视频作品管理 */}
+              {activeTab === 'videoWorks' && (
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-6">视频作品管理</h2>
+                  <div className="flex justify-between items-center mb-6">
+                    <p className="text-gray-300">管理您的视频作品列表</p>
+                    <motion.button 
+                      onClick={handleAddVideoWork}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      className="px-4 py-2 bg-primary hover:bg-primary/80 text-white rounded-lg transition-all duration-300 shadow-md hover:shadow-lg hover:shadow-primary/20"
+                    >
+                      添加视频作品
+                    </motion.button>
+                  </div>
+                  {/* 视频作品列表 */}
+                  <div className="space-y-4">
+                    {videoWorks.length > 0 ? (
+                      videoWorks.map((videoWork) => (
+                        <div key={videoWork.id} className="bg-white/5 rounded-xl p-4 border border-white/10">
+                          <div className="flex justify-between items-start gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="text-lg font-semibold text-white">{videoWork.title}</h3>
+                                {videoWork.isFeatured && (
+                                  <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full border border-yellow-500/30 flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                    </svg>
+                                    精选
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-gray-400 text-sm mb-2 line-clamp-2">{videoWork.description}</p>
+                              <div className="flex gap-1 flex-wrap">
+                                {videoWork.tags?.map((tag, i) => (
+                                  <span key={i} className="px-2 py-1 bg-secondary/20 text-secondary text-xs rounded-full">
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => toggleFeaturedVideoWork(videoWork.id)}
+                                className={`px-3 py-1 rounded-lg text-sm transition-all ${
+                                  videoWork.isFeatured 
+                                    ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30' 
+                                    : 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30'
+                                }`}
+                              >
+                                {videoWork.isFeatured ? '取消精选' : '设为精选'}
+                              </button>
+                              <button 
+                                onClick={() => handleEditVideoWork(videoWork)}
+                                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm transition-all duration-300 shadow-sm hover:shadow-md"
+                              >
+                                编辑
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteVideoWork(videoWork.id)}
+                                className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm transition-all duration-300 shadow-sm hover:shadow-md"
+                              >
+                                删除
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-center py-8">暂无视频作品</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* AI作品管理 */}
+              {activeTab === 'aiWorks' && (
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-6">AI作品管理</h2>
+                  <div className="flex justify-between items-center mb-6">
+                    <p className="text-gray-300">管理您的AI作品列表</p>
+                    <motion.button 
+                      onClick={handleAddImageWork}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      className="px-4 py-2 bg-primary hover:bg-primary/80 text-white rounded-lg transition-all duration-300 shadow-md hover:shadow-lg hover:shadow-primary/20"
+                    >
+                      添加AI作品
+                    </motion.button>
+                  </div>
+                  {/* AI作品列表 */}
+                  <div className="space-y-4">
+                    {imageWorks.length > 0 ? (
+                      imageWorks.map((imageWork) => (
+                        <div key={imageWork.id} className="bg-white/5 rounded-xl p-4 border border-white/10">
+                          <div className="flex justify-between items-start gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="text-lg font-semibold text-white">{imageWork.title}</h3>
+                                {imageWork.isFeatured && (
+                                  <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full border border-yellow-500/30 flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                    </svg>
+                                    精选
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-gray-400 text-sm mb-2 line-clamp-2">{imageWork.description}</p>
+                              <div className="flex gap-1 flex-wrap">
+                                {imageWork.tags?.map((tag, i) => (
+                                  <span key={i} className="px-2 py-1 bg-secondary/20 text-secondary text-xs rounded-full">
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => toggleFeaturedImageWork(imageWork.id)}
+                                className={`px-3 py-1 rounded-lg text-sm transition-all ${
+                                  imageWork.isFeatured 
+                                    ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30' 
+                                    : 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30'
+                                }`}
+                              >
+                                {imageWork.isFeatured ? '取消精选' : '设为精选'}
+                              </button>
+                              <button 
+                                onClick={() => handleEditImageWork(imageWork)}
+                                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm transition-all duration-300 shadow-sm hover:shadow-md"
+                              >
+                                编辑
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteImageWork(imageWork.id)}
+                                className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm transition-all duration-300 shadow-sm hover:shadow-md"
+                              >
+                                删除
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-center py-8">暂无AI作品</p>
                     )}
                   </div>
                 </div>
@@ -1796,6 +2361,7 @@ const AdminPage: React.FC = () => {
                             <input 
                               type="file" 
                               accept="image/*" 
+                              multiple
                               onChange={handleProjectImageUpload}
                               className="hidden"
                               disabled={isUploadingProjectImage}
@@ -1920,6 +2486,333 @@ const AdminPage: React.FC = () => {
                       >
                         保存
                       </motion.button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+
+          {/* 视频作品模态框 */}
+          {showVideoModal && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.2 }}
+                className="relative bg-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-blue-500/30 shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto"
+              >
+                <div className="relative z-10">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-white">{videoModalTitle}</h3>
+                    <button 
+                      onClick={() => setShowVideoModal(false)}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-gray-300 text-sm mb-2">标题 *</label>
+                      <input 
+                        type="text"
+                        value={videoFormData.title}
+                        onChange={(e) => setVideoFormData({...videoFormData, title: e.target.value})}
+                        className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="输入视频标题"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-300 text-sm mb-2">描述</label>
+                      <textarea 
+                        value={videoFormData.description}
+                        onChange={(e) => setVideoFormData({...videoFormData, description: e.target.value})}
+                        className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 h-20 resize-none"
+                        placeholder="输入视频描述（可选）"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-300 text-sm mb-2">视频 *</label>
+                      <label className="flex flex-col items-center justify-center w-full px-4 py-6 bg-blue-600/30 hover:bg-blue-600/50 border-2 border-dashed border-blue-500/50 rounded-lg cursor-pointer transition-all">
+                        <input 
+                          type="file" 
+                          accept="video/*"
+                          onChange={handleVideoUpload}
+                          className="hidden"
+                          disabled={isUploadingVideo}
+                        />
+                        {isUploadingVideo ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <svg className="animate-spin h-6 w-6 text-blue-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span className="text-blue-300">上传中... {videoUploadProgress}%</span>
+                          </div>
+                        ) : videoFormData.videoUrl ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-400">
+                              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                            <span className="text-green-400 text-sm">视频已上传</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-300">
+                              <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                            </svg>
+                            <span className="text-blue-300">点击或拖拽上传视频</span>
+                            <span className="text-gray-500 text-xs">支持 MP4、WebM，最大 100MB</span>
+                          </div>
+                        )}
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-300 text-sm mb-2">创作提示词</label>
+                      <textarea 
+                        value={videoFormData.prompt}
+                        onChange={(e) => setVideoFormData({...videoFormData, prompt: e.target.value})}
+                        className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 h-20 resize-none font-mono text-sm"
+                        placeholder="输入创作提示词（可选）"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-300 text-sm mb-2">标签</label>
+                      <div className="flex gap-2 mb-2">
+                        <input 
+                          type="text"
+                          value={tagInput}
+                          onChange={(e) => setTagInput(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
+                          className="flex-1 px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="输入标签并按回车"
+                        />
+                        <button 
+                          onClick={handleAddTag}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+                        >
+                          添加
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {videoFormData.tags.map((tag, index) => (
+                          <span key={index} className="px-3 py-1 bg-blue-600/30 text-blue-300 text-sm rounded-full flex items-center gap-1">
+                            {tag}
+                            <button 
+                              onClick={() => handleRemoveTag(tag)}
+                              className="text-blue-400 hover:text-white"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="checkbox"
+                        id="videoFeatured"
+                        checked={videoFormData.isFeatured}
+                        onChange={(e) => setVideoFormData({...videoFormData, isFeatured: e.target.checked})}
+                        className="w-4 h-4 rounded border-gray-600 text-blue-500 focus:ring-blue-500"
+                      />
+                      <label htmlFor="videoFeatured" className="text-gray-300 text-sm">设为精选</label>
+                    </div>
+
+                    <div className="flex gap-3 pt-4">
+                      <button 
+                        onClick={() => setShowVideoModal(false)}
+                        className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                      >
+                        取消
+                      </button>
+                      <button 
+                        onClick={handleSaveVideoWork}
+                        className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+                      >
+                        保存
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+
+          {/* AI作品模态框 */}
+          {showImageModal && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.2 }}
+                className="relative bg-gray-900/95 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30 shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto"
+              >
+                <div className="relative z-10">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-white">{imageModalTitle}</h3>
+                    <button 
+                      onClick={() => setShowImageModal(false)}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-gray-300 text-sm mb-2">标题 *</label>
+                      <input 
+                        type="text"
+                        name="title"
+                        value={imageFormData.title}
+                        onChange={handleImageInputChange}
+                        className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="输入作品标题"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-300 text-sm mb-2">描述 *</label>
+                      <textarea 
+                        name="description"
+                        value={imageFormData.description}
+                        onChange={handleImageInputChange}
+                        className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 h-24 resize-none"
+                        placeholder="输入作品描述"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-300 text-sm mb-2">图片 *</label>
+                      <label className="flex flex-col items-center justify-center w-full px-4 py-6 bg-purple-600/30 hover:bg-purple-600/50 border-2 border-dashed border-purple-500/50 rounded-lg cursor-pointer transition-all">
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                          disabled={isUploadingImage}
+                        />
+                        {isUploadingImage ? (
+                          <div className="flex items-center gap-2 text-purple-300">
+                            <svg className="animate-spin h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>上传中...</span>
+                          </div>
+                        ) : imageFormData.imageUrl ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-400">
+                              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                            <span className="text-green-400 text-sm">图片已上传</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-300">
+                              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                              <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            <span className="text-purple-300">点击或拖拽上传图片</span>
+                            <span className="text-gray-500 text-xs">支持 JPG、PNG、WebP，最大 10MB</span>
+                          </div>
+                        )}
+                      </label>
+                      {imageFormData.imageUrl && (
+                        <div className="mt-3">
+                          <img src={imageFormData.imageUrl} alt="预览" className="max-w-full h-auto max-h-48 rounded-lg border border-white/20" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-300 text-sm mb-2">创作提示词</label>
+                      <textarea 
+                        name="prompt"
+                        value={imageFormData.prompt}
+                        onChange={handleImageInputChange}
+                        className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 h-20 resize-none font-mono text-sm"
+                        placeholder="输入创作提示词（可选）"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-300 text-sm mb-2">标签</label>
+                      <div className="flex gap-2 mb-2">
+                        <input 
+                          type="text"
+                          value={tagInput}
+                          onChange={(e) => setTagInput(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleImageTagAdd()}
+                          className="flex-1 px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          placeholder="输入标签并按回车"
+                        />
+                        <button 
+                          onClick={handleImageTagAdd}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors"
+                        >
+                          添加
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {imageFormData.tags.map((tag, index) => (
+                          <span key={index} className="px-3 py-1 bg-purple-600/30 text-purple-300 text-sm rounded-full flex items-center gap-1">
+                            {tag}
+                            <button 
+                              onClick={() => handleImageTagRemove(tag)}
+                              className="text-purple-400 hover:text-white"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="checkbox"
+                        id="imageFeatured"
+                        checked={imageFormData.isFeatured}
+                        onChange={(e) => setImageFormData({...imageFormData, isFeatured: e.target.checked})}
+                        className="w-4 h-4 rounded border-gray-600 text-purple-500 focus:ring-purple-500"
+                      />
+                      <label htmlFor="imageFeatured" className="text-gray-300 text-sm">设为精选</label>
+                    </div>
+
+                    <div className="flex gap-3 pt-4">
+                      <button 
+                        onClick={() => setShowImageModal(false)}
+                        className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                      >
+                        取消
+                      </button>
+                      <button 
+                        onClick={handleSaveImageWork}
+                        className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors"
+                      >
+                        保存
+                      </button>
                     </div>
                   </div>
                 </div>

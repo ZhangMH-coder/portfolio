@@ -72,9 +72,7 @@ const ProjectsPage = () => {
         if (projectsData && projectsData.length > 0) {
           const validProjects = projectsData.filter((project: Project) => {
             const hasValidImage = project.images && project.images.length > 0 && project.images.some((img: string) => isValidUrl(img));
-            return hasValidImage && 
-                   (!project.demoLink || isValidUrl(project.demoLink)) && 
-                   (!project.githubLink || isValidUrl(project.githubLink));
+            return hasValidImage || true;
           });
           setProjects(validProjects);
         } else {

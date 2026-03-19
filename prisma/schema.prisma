@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client"
-  output   = "../src/generated"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -37,6 +37,31 @@ model Project {
   techStack   Json
   demoLink    String?
   githubLink  String?
+  isFeatured  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model VideoWork {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  videoUrl    String
+  thumbnail   String?
+  prompt      String?
+  tags        Json
+  isFeatured  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ImageWork {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  imageUrl    String
+  prompt      String?
+  tags        Json
   isFeatured  Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

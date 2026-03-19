@@ -3,10 +3,12 @@
 
 import { PrismaClient } from '../generated/prisma/client';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
+import path from 'path';
 
-// 创建适配器
+// 使用绝对路径
+const dbUrl = `file:${path.resolve(process.cwd(), 'prisma', 'dev.db')}`;
 const adapter = new PrismaLibSql({
-  url: 'file:prisma/dev.db'
+  url: dbUrl
 });
 
 // 创建全局 Prisma 客户端实例

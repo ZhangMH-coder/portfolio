@@ -14,6 +14,7 @@ const Navbar = () => {
   const navItems = [
     { name: '首页', path: '' },
     { name: '项目', path: 'projects' },
+    { name: '作品集', path: 'works' },
     { name: '关于', path: 'about' },
     { name: '联系', path: 'contact' },
     { name: '指令集', path: 'prompts' },

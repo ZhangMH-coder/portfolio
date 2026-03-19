@@ -363,3 +363,100 @@ export const contactInfoApi = {
     }
   },
 };
+
+// 视频作品相关 API
+export const videoWorkApi = {
+  async getVideoWorks() {
+    try {
+      const response = await fetch('/api/video-works');
+      if (!response.ok) throw new Error('获取视频作品失败');
+      return await response.json();
+    } catch (error) {
+      console.error('获取视频作品失败:', error);
+      return [];
+    }
+  },
+  async createVideoWork(data: {
+    title: string;
+    description: string;
+    videoUrl: string;
+    thumbnail?: string;
+    prompt?: string;
+    tags?: string[];
+    isFeatured?: boolean;
+  }) {
+    const response = await fetch('/api/video-works', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('创建视频作品失败');
+    return await response.json();
+  },
+  async updateVideoWork(id: string, data: any) {
+    const response = await fetch('/api/video-works', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...data }),
+    });
+    if (!response.ok) throw new Error('更新视频作品失败');
+    return await response.json();
+  },
+  async deleteVideoWork(id: string) {
+    const response = await fetch('/api/video-works', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!response.ok) throw new Error('删除视频作品失败');
+    return true;
+  },
+};
+
+// AI图片作品相关 API
+export const imageWorkApi = {
+  async getImageWorks() {
+    try {
+      const response = await fetch('/api/image-works');
+      if (!response.ok) throw new Error('获取图片作品失败');
+      return await response.json();
+    } catch (error) {
+      console.error('获取图片作品失败:', error);
+      return [];
+    }
+  },
+  async createImageWork(data: {
+    title: string;
+    description: string;
+    imageUrl: string;
+    prompt?: string;
+    tags?: string[];
+    isFeatured?: boolean;
+  }) {
+    const response = await fetch('/api/image-works', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('创建图片作品失败');
+    return await response.json();
+  },
+  async updateImageWork(id: string, data: any) {
+    const response = await fetch('/api/image-works', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...data }),
+    });
+    if (!response.ok) throw new Error('更新图片作品失败');
+    return await response.json();
+  },
+  async deleteImageWork(id: string) {
+    const response = await fetch('/api/image-works', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!response.ok) throw new Error('删除图片作品失败');
+    return true;
+  },
+};
