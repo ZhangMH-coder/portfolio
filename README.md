@@ -207,12 +207,5 @@ npx prisma db push
 
 MIT License
 
-## 联系方式
 
-- 邮箱：2954929104@qq.com
-- GitHub：https://github.com/ZhangMH-coder/
-- Bilibili：https://space.bilibili.com/380750498
 
----
-
-感谢您的关注和支持！
