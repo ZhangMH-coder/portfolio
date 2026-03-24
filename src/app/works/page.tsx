@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { imageWorkApi, videoWorkApi } from '../../lib/api';
 
 interface ImageWork {
   id: string;
@@ -41,10 +42,12 @@ const WorksPage = () => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch('/data/works.json');
-        const data = await response.json();
-        setImageWorks(data.imageWorks || []);
-        setVideoWorks(data.videoWorks || []);
+        const [imagesData, videosData] = await Promise.all([
+          imageWorkApi.getImageWorks(),
+          videoWorkApi.getVideoWorks()
+        ]);
+        setImageWorks(imagesData || []);
+        setVideoWorks(videosData || []);
       } catch (error) {
         console.error('加载数据失败:', error);
       } finally {

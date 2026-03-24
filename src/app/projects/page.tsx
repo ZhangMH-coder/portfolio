@@ -68,10 +68,9 @@ const ProjectsPage = () => {
   useEffect(() => {
     const loadProjects = async () => {
       try {
-        const response = await fetch('/data/works.json');
-        const data = await response.json();
-        if (data.projects && data.projects.length > 0) {
-          const validProjects = data.projects.filter((project: Project) => {
+        const projectsData = await projectApi.getProjects();
+        if (projectsData && projectsData.length > 0) {
+          const validProjects = projectsData.filter((project: Project) => {
             const hasValidImage = project.images && project.images.length > 0 && project.images.some((img: string) => isValidUrl(img));
             return hasValidImage || true;
           });
